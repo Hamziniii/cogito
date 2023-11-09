@@ -68,6 +68,11 @@ let removeCell (t: Table) (p: CellPosition) : Table =
       Rows = t.Rows
       Cols = t.Cols }
 
+let copyCell (t: Table) (op: CellPosition) (np: CellPosition) : Table =
+    match getCell t op with
+    | Some v -> updateCell t np v
+    | None -> removeCell t np
+
 let moveCell (t: Table) (op: CellPosition) (np: CellPosition) : Table =
     match getCell t op with
     | Some v -> updateCell (removeCell t op) np v
