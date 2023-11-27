@@ -12,7 +12,7 @@ t <- table.updateCell t { Row = 4; Col = 4 } (CellInt(16))
 table.printTable t
 
 t <-
-    table.moveSubtable
+    table.moveRange
         t
         { Top = 3
           Bottom = 4

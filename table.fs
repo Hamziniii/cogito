@@ -173,13 +173,13 @@ let getStartPos (r: Range) : CellPos =
     | ByCol(BToT, LToR) -> { Row = r.Bottom; Col = r.Left }
     | ByCol(BToT, RToL) -> { Row = r.Bottom; Col = r.Right }
 
-let updateSubtable (t: Table) (r: Range) (f: CellPos -> CellVal option) : Table =
+let updateRange (t: Table) (r: Range) (f: CellPos -> CellVal option) : Table =
     updateCells (getNextCell r) (getStopCond r) t (getStartPos r) f
 
-let removeSubtable (t: Table) (r: Range) : Table =
+let removeRange (t: Table) (r: Range) : Table =
     removeCells (getNextCell r) (getStopCond r) t (getStartPos r)
 
-let moveSubtable (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
+let moveRange (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
     let rowOff = np.Row - op.Row
     let colOff = np.Col - op.Col
 
@@ -197,4 +197,4 @@ let moveSubtable (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
           Left = r.Left + colOff
           Order = r.Order }
 
-    updateCells (getNextCell nr) (getStopCond nr) (removeSubtable t r) (getStartPos nr) f
+    updateCells (getNextCell nr) (getStopCond nr) (removeRange t r) (getStartPos nr) f
