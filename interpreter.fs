@@ -32,6 +32,7 @@ type Cmd =
     | Delete of Exp
     | Load of string
     | Store of string
+    | ForRange of Ident * Exp * Cmd
 
 type Value =
     | IntVal of int
@@ -44,6 +45,14 @@ type Value =
 type Env = Map<Ident, Value>
 
 type Config = Cmd * Env * table.Table
+
+(* Helpers *)
+
+let cellPosToExp (p: table.CellPos) : Exp = Cell(Int p.Row, Int p.Col)
+
+let cellVarToPos (x: Ident) (r: Env) : table.CellPos =
+    match Map.find x r with
+    | CellVal p -> p
 
 (* Semantics *)
 
@@ -125,7 +134,10 @@ let rec stepCmd ((c, r, t): Config) : Config option =
         | Some(RangeVal g), Some(IntVal i) -> Some(Skip, r, table.updateRange t g (fun p -> Some(table.CellInt i)))
         | Some(RangeVal g), Some(StrVal s) -> Some(Skip, r, table.updateRange t g (fun p -> Some(table.CellStr s)))
         | Some(RangeVal g), Some(ArrayVal a) ->
-            Some(Skip, r, table.updateRange t g (fun p -> a[p.Row - g.Top][p.Col - g.Left]))
+            if a.Length = (g.Bottom - g.Top + 1) && a[0].Length = (g.Right - g.Left + 1) then
+                Some(Skip, r, table.updateRange t g (fun p -> a[p.Row - g.Top][p.Col - g.Left]))
+            else
+                None
         | _ -> None
     | Delete e ->
         match evalExp e r t with
@@ -140,6 +152,21 @@ let rec stepCmd ((c, r, t): Config) : Config option =
         match file.storeTable f t with
         | true -> Some(Skip, r, t)
         | false -> None
+    | ForRange(x, e, b) ->
+        match evalExp e r t with
+        | Some(RangeVal g) ->
+            Some(
+                Seq(
+                    Assign(x, cellPosToExp (table.getStartPos g)),
+                    While(
+                        Not(Eq(Var x, cellPosToExp (table.getNextCell g (table.getEndPos g)))),
+                        Seq(b, Assign(x, cellPosToExp (table.getNextCell g (cellVarToPos x r))))
+                    )
+                ),
+                r,
+                t
+            )
+        | _ -> None
 
 let rec runConfig (cfg: Config) : Config =
     match stepCmd cfg with

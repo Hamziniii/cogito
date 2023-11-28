@@ -173,6 +173,18 @@ let getStartPos (r: Range) : CellPos =
     | ByCol(BToT, LToR) -> { Row = r.Bottom; Col = r.Left }
     | ByCol(BToT, RToL) -> { Row = r.Bottom; Col = r.Right }
 
+let getEndPos (r: Range) : CellPos =
+    match r.Order with
+    | Unspecified
+    | ByRow(LToR, TToB) -> { Row = r.Bottom; Col = r.Right }
+    | ByRow(LToR, BToT) -> { Row = r.Top; Col = r.Right }
+    | ByRow(RToL, TToB) -> { Row = r.Bottom; Col = r.Left }
+    | ByRow(RToL, BToT) -> { Row = r.Top; Col = r.Left }
+    | ByCol(TToB, LToR) -> { Row = r.Bottom; Col = r.Right }
+    | ByCol(TToB, RToL) -> { Row = r.Bottom; Col = r.Left }
+    | ByCol(BToT, LToR) -> { Row = r.Top; Col = r.Right }
+    | ByCol(BToT, RToL) -> { Row = r.Top; Col = r.Left }
+
 let updateRange (t: Table) (r: Range) (f: CellPos -> CellVal option) : Table =
     updateCells (getNextCell r) (getStopCond r) t (getStartPos r) f
 
