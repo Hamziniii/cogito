@@ -198,3 +198,14 @@ let moveRange (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
           Order = r.Order }
 
     updateCells (getNextCell nr) (getStopCond nr) (removeRange t r) (getStartPos nr) f
+
+let rangeToArray (t: Table) (r: Range) : CellVal option array array =
+    Array.init (r.Bottom - r.Top) (fun ri ->
+        Array.init (r.Right - r.Left) (fun ci -> getCell t { Row = r.Top + ri; Col = r.Left + ci }))
+
+let cellsToRange (p1: CellPos) (p2: CellPos) (o: IterOrder) : Range =
+    { Top = min p1.Row p2.Row
+      Bottom = max p1.Row p2.Row
+      Left = min p1.Col p2.Col
+      Right = max p1.Col p2.Col
+      Order = o }
