@@ -4,10 +4,10 @@ open table
 
 let mutable t = table.newTable
 
-t <- table.updateCell t { Row = 3; Col = 3 } (CellInt(9))
-t <- table.updateCell t { Row = 3; Col = 4 } (CellInt(12))
-t <- table.updateCell t { Row = 4; Col = 3 } (CellInt(12))
-t <- table.updateCell t { Row = 4; Col = 4 } (CellInt(16))
+t <- table.updateCell t { Row = 3; Col = 3 } (CellInt 9)
+t <- table.updateCell t { Row = 3; Col = 4 } (CellInt 12)
+t <- table.updateCell t { Row = 4; Col = 3 } (CellInt 12)
+t <- table.updateCell t { Row = 4; Col = 4 } (CellInt 16)
 
 table.printTable t
 
