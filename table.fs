@@ -211,9 +211,9 @@ let moveRange (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
 
     updateCells (getNextCell nr) (getStopCond nr) (removeRange t r) (getStartPos nr) f
 
-let rangeToArray (t: Table) (r: Range) : CellVal option array array =
-    Array.init (r.Bottom - r.Top) (fun ri ->
-        Array.init (r.Right - r.Left) (fun ci -> getCell t { Row = r.Top + ri; Col = r.Left + ci }))
+let rangeToArray (t: Table) (r: Range) : CellVal option array2d =
+    Array2D.init (r.Bottom - r.Top + 1) (r.Right - r.Left + 1) (fun ri ci ->
+        getCell t { Row = r.Top + ri; Col = r.Left + ci })
 
 let cellsToRange (p1: CellPos) (p2: CellPos) (o: IterOrder) : Range =
     { Top = min p1.Row p2.Row

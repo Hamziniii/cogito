@@ -20,7 +20,7 @@ type Exp =
     | Cell of Exp * Exp
     | Deref of Exp
     | Range of Exp * Exp * table.IterOrder
-    | Array of table.CellVal option array array
+    | Array of table.CellVal option array2d
 
 type Cmd =
     | Assign of Ident * Exp
@@ -40,19 +40,18 @@ type Value =
     | StrVal of string
     | CellVal of table.CellPos
     | RangeVal of table.Range
-    | ArrayVal of table.CellVal option array array
+    | ArrayVal of table.CellVal option array2d
 
 type Env = Map<Ident, Value>
 
-type Config = Cmd * Env * table.Table
+type Clay =
+    { Iterating: bool; Next: table.CellPos }
+
+type Config = Cmd * Env * Clay * table.Table
 
 (* Helpers *)
 
 let cellPosToExp (p: table.CellPos) : Exp = Cell(Int p.Row, Int p.Col)
-
-let cellVarToPos (x: Ident) (r: Env) : table.CellPos =
-    match Map.find x r with
-    | CellVal p -> p
 
 (* Semantics *)
 
@@ -109,63 +108,79 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
         | _ -> None
     | Array a -> Some(ArrayVal a)
 
-let rec stepCmd ((c, r, t): Config) : Config option =
+let rec stepCmd ((c, r, y, t): Config) : Config option =
     match c with
     | Assign(x, e) ->
         match evalExp e r t with
-        | Some v -> Some(Skip, Map.add x v r, t)
+        | Some v -> Some(Skip, Map.add x v r, y, t)
         | _ -> None
-    | Seq(Skip, c2) -> Some(c2, r, t)
+    | Seq(Skip, c2) -> Some(c2, r, y, t)
     | Seq(c1, c2) ->
-        match stepCmd (c1, r, t) with
-        | Some(c1', r', t') -> Some(Seq(c1', c2), r', t')
+        match stepCmd (c1, r, y, t) with
+        | Some(c1', r', y', t') -> Some(Seq(c1', c2), r', y', t')
         | _ -> None
     | Skip -> None
     | If(e, c1, c2) ->
         match evalExp e r t with
-        | Some(BoolVal true) -> Some(c1, r, t)
-        | Some(BoolVal false) -> Some(c2, r, t)
+        | Some(BoolVal true) -> Some(c1, r, y, t)
+        | Some(BoolVal false) -> Some(c2, r, y, t)
         | _ -> None
-    | While(e, b) -> Some(If(e, Seq(b, While(e, b)), Skip), r, t)
+    | While(e, b) -> Some(If(e, Seq(b, While(e, b)), Skip), r, y, t)
     | Fill(e, v) ->
         match evalExp e r t, evalExp v r t with
-        | Some(CellVal p), Some(IntVal i) -> Some(Skip, r, table.updateCell t p (table.CellInt i))
-        | Some(CellVal p), Some(StrVal s) -> Some(Skip, r, table.updateCell t p (table.CellStr s))
-        | Some(RangeVal g), Some(IntVal i) -> Some(Skip, r, table.updateRange t g (fun p -> Some(table.CellInt i)))
-        | Some(RangeVal g), Some(StrVal s) -> Some(Skip, r, table.updateRange t g (fun p -> Some(table.CellStr s)))
+        | Some(CellVal p), Some(IntVal i) -> Some(Skip, r, y, table.updateCell t p (table.CellInt i))
+        | Some(CellVal p), Some(StrVal s) -> Some(Skip, r, y, table.updateCell t p (table.CellStr s))
+        | Some(RangeVal g), Some(IntVal i) -> Some(Skip, r, y, table.updateRange t g (fun p -> Some(table.CellInt i)))
+        | Some(RangeVal g), Some(StrVal s) -> Some(Skip, r, y, table.updateRange t g (fun p -> Some(table.CellStr s)))
         | Some(RangeVal g), Some(ArrayVal a) ->
-            if a.Length = (g.Bottom - g.Top + 1) && a[0].Length = (g.Right - g.Left + 1) then
-                Some(Skip, r, table.updateRange t g (fun p -> a[p.Row - g.Top][p.Col - g.Left]))
+            if
+                Array2D.length1 a = (g.Bottom - g.Top + 1)
+                && Array2D.length2 a = (g.Right - g.Left + 1)
+            then
+                Some(Skip, r, y, table.updateRange t g (fun p -> a[p.Row - g.Top, p.Col - g.Left]))
             else
                 None
         | _ -> None
     | Delete e ->
         match evalExp e r t with
-        | Some(CellVal p) -> Some(Skip, r, table.removeCell t p)
-        | Some(RangeVal g) -> Some(Skip, r, table.removeRange t g)
+        | Some(CellVal p) -> Some(Skip, r, y, table.removeCell t p)
+        | Some(RangeVal g) -> Some(Skip, r, y, table.removeRange t g)
         | _ -> None
     | Load f ->
         match file.loadTable f with
-        | Some nt -> Some(Skip, r, nt)
+        | Some nt -> Some(Skip, r, y, nt)
         | None -> None
     | Store f ->
         match file.storeTable f t with
-        | true -> Some(Skip, r, t)
+        | true -> Some(Skip, r, y, t)
         | false -> None
     | ForRange(x, e, b) ->
         match evalExp e r t with
         | Some(RangeVal g) ->
-            Some(
-                Seq(
-                    Assign(x, cellPosToExp (table.getStartPos g)),
-                    While(
-                        Not(Eq(Var x, cellPosToExp (table.getNextCell g (table.getEndPos g)))),
-                        Seq(b, Assign(x, cellPosToExp (table.getNextCell g (cellVarToPos x r))))
-                    )
-                ),
-                r,
-                t
-            )
+            if not y.Iterating then
+                Some(
+                    Seq(Seq(Assign(x, cellPosToExp (table.getStartPos g)), b), ForRange(x, e, b)),
+                    r,
+                    { Iterating = true
+                      Next = table.getNextCell g (table.getStartPos g) },
+                    t
+                )
+            else if y.Iterating && not ((table.getStopCond g) y.Next) then
+                Some(
+                    Seq(Seq(Assign(x, cellPosToExp y.Next), b), ForRange(x, e, b)),
+                    r,
+                    { Iterating = true
+                      Next = table.getNextCell g y.Next },
+                    t
+                )
+            else
+                Some(
+                    Skip,
+                    r,
+                    { Iterating = false
+                      Next = { Row = 0; Col = 0 } },
+                    t
+                )
         | _ -> None
 
 let rec runConfig (cfg: Config) : Config =
@@ -174,4 +189,10 @@ let rec runConfig (cfg: Config) : Config =
     | None -> cfg
 
 let rec runProg (c: Cmd) : Config =
-    runConfig (c, Map.empty, table.newTable)
+    runConfig (
+        c,
+        Map.empty,
+        { Iterating = false
+          Next = { Row = 0; Col = 0 } },
+        table.newTable
+    )
