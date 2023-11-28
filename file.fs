@@ -1,5 +1,5 @@
 module file
 
-let loadTable (f: string) : table.Table = table.newTable
+let loadTable (f: string) : table.Table option = Some(table.newTable)
 
-let storeTable (f: string) (t: table.Table) : unit = ()
+let storeTable (f: string) (t: table.Table) : bool = true

@@ -14,6 +14,7 @@ type Exp =
     | Bool of bool
     | And of Exp * Exp
     | Or of Exp * Exp
+    | Not of Exp
     | Eq of Exp * Exp
     | Str of string
     | Cell of Exp * Exp
@@ -67,10 +68,17 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
         match evalExp e1 r t, evalExp e2 r t with
         | Some(BoolVal b1), Some(BoolVal b2) -> Some(BoolVal(b1 || b2))
         | _, _ -> None
+    | Not e ->
+        match evalExp e r t with
+        | Some(BoolVal b) -> Some(BoolVal(not b))
+        | _ -> None
     | Eq(e1, e2) ->
         match evalExp e1 r t, evalExp e2 r t with
         | Some(IntVal i1), Some(IntVal i2) -> Some(BoolVal(i1 = i2))
         | Some(BoolVal b1), Some(BoolVal b2) -> Some(BoolVal(b1 = b2))
+        | Some(StrVal s1), Some(StrVal s2) -> Some(BoolVal(s1 = s2))
+        | Some(CellVal c1), Some(CellVal c2) -> Some(BoolVal(c1 = c2))
+        | Some(RangeVal g1), Some(RangeVal g2) -> Some(BoolVal(g1 = g2))
         | _, _ -> None
     | Str s -> Some(StrVal s)
     | Cell(e1, e2) ->
@@ -124,10 +132,14 @@ let rec stepCmd ((c, r, t): Config) : Config option =
         | Some(CellVal p) -> Some(Skip, r, table.removeCell t p)
         | Some(RangeVal g) -> Some(Skip, r, table.removeRange t g)
         | _ -> None
-    | Load f -> Some(Skip, r, file.loadTable f)
+    | Load f ->
+        match file.loadTable f with
+        | Some nt -> Some(Skip, r, nt)
+        | None -> None
     | Store f ->
-        file.storeTable f t
-        Some(Skip, r, t)
+        match file.storeTable f t with
+        | true -> Some(Skip, r, t)
+        | false -> None
 
 let rec runConfig (cfg: Config) : Config =
     match stepCmd cfg with
