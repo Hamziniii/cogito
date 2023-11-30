@@ -17,7 +17,9 @@ type Exp =
     | Not of Exp
     | Eq of Exp * Exp
     | Str of string
+    | Excel of table.ExcelExpr
     | Cell of Exp * Exp
+    | View of Exp
     | Deref of Exp
     | Range of Exp * Exp * table.IterOrder
     | Array of table.CellVal option array2d
@@ -38,6 +40,7 @@ type Value =
     | IntVal of int
     | BoolVal of bool
     | StrVal of string
+    | ExcelVal of table.ExcelExpr
     | CellVal of table.CellPos
     | RangeVal of table.Range
     | ArrayVal of table.CellVal option array2d
@@ -52,6 +55,11 @@ type Config = Cmd * Env * Clay * table.Table
 (* Helpers *)
 
 let cellPosToExp (p: table.CellPos) : Exp = Cell(Int p.Row, Int p.Col)
+
+let viewCell (t: table.Table) (v: table.CellVal option) : table.CellVal option =
+    match v with
+    | Some(table.CellExpr x) -> Some(table.CellInt(int (excel.evalExcelExpr t x)))
+    | _ -> v
 
 (* Semantics *)
 
@@ -89,9 +97,20 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
         | Some(RangeVal g1), Some(RangeVal g2) -> Some(BoolVal(g1 = g2))
         | _, _ -> None
     | Str s -> Some(StrVal s)
+    | Excel x -> Some(ExcelVal x)
     | Cell(e1, e2) ->
         match evalExp e1 r t, evalExp e2 r t with
         | Some(IntVal i1), Some(IntVal i2) -> Some(CellVal { Row = i1; Col = i2 })
+        | _ -> None
+    | View e ->
+        match evalExp e r t with
+        | Some(CellVal p) ->
+            match table.getCell t p with
+            | Some(table.CellInt i) -> Some(IntVal i)
+            | Some(table.CellStr s) -> Some(StrVal s)
+            | Some(table.CellExpr x) -> Some(IntVal(int (excel.evalExcelExpr t x)))
+            | _ -> None
+        | Some(RangeVal g) -> Some(ArrayVal(Array2D.map (viewCell t) (table.rangeToArray t g)))
         | _ -> None
     | Deref e ->
         match evalExp e r t with
@@ -99,6 +118,7 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
             match table.getCell t p with
             | Some(table.CellInt i) -> Some(IntVal i)
             | Some(table.CellStr s) -> Some(StrVal s)
+            | Some(table.CellExpr x) -> Some(ExcelVal x)
             | _ -> None
         | Some(RangeVal g) -> Some(ArrayVal(table.rangeToArray t g))
         | _ -> None
@@ -130,6 +150,7 @@ let rec stepCmd ((c, r, y, t): Config) : Config option =
         match evalExp e r t, evalExp v r t with
         | Some(CellVal p), Some(IntVal i) -> Some(Skip, r, y, table.updateCell t p (table.CellInt i))
         | Some(CellVal p), Some(StrVal s) -> Some(Skip, r, y, table.updateCell t p (table.CellStr s))
+        | Some(CellVal p), Some(ExcelVal x) -> Some(Skip, r, y, table.updateCell t p (table.CellExpr x))
         | Some(RangeVal g), Some(IntVal i) -> Some(Skip, r, y, table.updateRange t g (fun p -> Some(table.CellInt i)))
         | Some(RangeVal g), Some(StrVal s) -> Some(Skip, r, y, table.updateRange t g (fun p -> Some(table.CellStr s)))
         | Some(RangeVal g), Some(ArrayVal a) ->
