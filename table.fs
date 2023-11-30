@@ -4,16 +4,6 @@ type CellRow = int
 type CellCol = int
 type CellPos = { Row: CellRow; Col: CellCol }
 
-type CellVal =
-    | CellInt of int
-    | CellStr of string
-    | CellExpr of string
-
-type Table =
-    { Cells: Map<CellPos, CellVal>
-      Rows: int
-      Cols: int }
-
 type HorizDir =
     | LToR
     | RToL
@@ -27,12 +17,35 @@ type IterOrder =
     | ByCol of VertDir * HorizDir
     | Unspecified
 
-type Range =
+type CellVal =
+    | CellInt of int
+    | CellStr of string
+    | CellExpr of ExcelExpr
+
+and ExcelExpr =
+    | SUM of Range list
+    | PRODUCT of Range list
+    | AVERAGE of Range list
+    | MEDIAN of Range list
+    | MODE of Range list
+    | MAX of Range list
+    | MIN of Range list
+    | VAR of Range list
+    | STDEV of Range list
+    | VARP of Range list
+    | STDEVP of Range list
+
+and Range =
     { Top: CellRow
       Bottom: CellRow
       Left: CellCol
       Right: CellCol
       Order: IterOrder }
+
+type Table =
+    { Cells: Map<CellPos, CellVal>
+      Rows: int
+      Cols: int }
 
 let newTable: Table =
     { Cells = Map.empty
@@ -49,7 +62,7 @@ let printTable (t: Table) : unit =
             match getCell t { Row = i; Col = j } with
             | Some(CellInt v) -> printf "%d" v
             | Some(CellStr v) -> printf "%s" v
-            | Some(CellExpr v) -> printf "%s" v
+            | Some(CellExpr v) -> printf "%A" v
             | None -> printf "None"
 
             printf "\t"
@@ -214,6 +227,14 @@ let moveRange (t: Table) (r: Range) (op: CellPos) (np: CellPos) : Table =
 let rangeToArray (t: Table) (r: Range) : CellVal option array2d =
     Array2D.init (r.Bottom - r.Top + 1) (r.Right - r.Left + 1) (fun ri ci ->
         getCell t { Row = r.Top + ri; Col = r.Left + ci })
+
+let rec rangeToList (t: Table) (r: Range) (p: CellPos) : CellVal option list =
+    match p with
+    | q when q = getEndPos r -> [ getCell t q ]
+    | q -> (getCell t q) :: (rangeToList t r (getNextCell r q))
+
+let rec rangesToList (t: Table) (l: Range list) : CellVal option list =
+    List.concat (List.map (fun r -> rangeToList t r (getStartPos r)) l)
 
 let cellsToRange (p1: CellPos) (p2: CellPos) (o: IterOrder) : Range =
     { Top = min p1.Row p2.Row
