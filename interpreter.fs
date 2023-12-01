@@ -26,7 +26,7 @@ type Exp =
 
 type Cmd =
     | Assign of Ident * Exp
-    | Seq of Cmd * Cmd
+    | Seq of Cmd list
     | Skip
     | If of Exp * Cmd * Cmd
     | While of Exp * Cmd
@@ -60,6 +60,17 @@ let viewCell (t: table.Table) (v: table.CellVal option) : table.CellVal option =
     match v with
     | Some(table.CellExpr x) -> Some(table.CellInt(int (excel.evalExcelExpr t x)))
     | _ -> v
+
+let viewTable (t: table.Table) =
+    { table.Cells =
+        Map.map
+            (fun p v ->
+                match v with
+                | table.CellExpr x -> table.CellInt(int (excel.evalExcelExpr t x))
+                | _ -> v)
+            t.Cells
+      table.Rows = t.Rows
+      table.Cols = t.Cols }
 
 (* Semantics *)
 
@@ -134,18 +145,19 @@ let rec stepCmd ((c, r, y, t): Config) : Config option =
         match evalExp e r t with
         | Some v -> Some(Skip, Map.add x v r, y, t)
         | _ -> None
-    | Seq(Skip, c2) -> Some(c2, r, y, t)
-    | Seq(c1, c2) ->
+    | Seq(Skip :: c2) -> Some(Seq(c2), r, y, t)
+    | Seq(c1 :: c2) ->
         match stepCmd (c1, r, y, t) with
-        | Some(c1', r', y', t') -> Some(Seq(c1', c2), r', y', t')
+        | Some(c1', r', y', t') -> Some(Seq(c1' :: c2), r', y', t')
         | _ -> None
+    | Seq([])
     | Skip -> None
     | If(e, c1, c2) ->
         match evalExp e r t with
         | Some(BoolVal true) -> Some(c1, r, y, t)
         | Some(BoolVal false) -> Some(c2, r, y, t)
         | _ -> None
-    | While(e, b) -> Some(If(e, Seq(b, While(e, b)), Skip), r, y, t)
+    | While(e, b) -> Some(If(e, Seq([ b; While(e, b) ]), Skip), r, y, t)
     | Fill(e, v) ->
         match evalExp e r t, evalExp v r t with
         | Some(CellVal p), Some(IntVal i) -> Some(Skip, r, y, table.updateCell t p (table.CellInt i))
@@ -180,7 +192,7 @@ let rec stepCmd ((c, r, y, t): Config) : Config option =
         | Some(RangeVal g) ->
             if not y.Iterating then
                 Some(
-                    Seq(Seq(Assign(x, cellPosToExp (table.getStartPos g)), b), ForRange(x, e, b)),
+                    Seq([ Assign(x, cellPosToExp (table.getStartPos g)); b; ForRange(x, e, b) ]),
                     r,
                     { Iterating = true
                       Next = table.getNextCell g (table.getStartPos g) },
@@ -188,7 +200,7 @@ let rec stepCmd ((c, r, y, t): Config) : Config option =
                 )
             else if y.Iterating && not ((table.getStopCond g) y.Next) then
                 Some(
-                    Seq(Seq(Assign(x, cellPosToExp y.Next), b), ForRange(x, e, b)),
+                    Seq([ Assign(x, cellPosToExp y.Next); b; ForRange(x, e, b) ]),
                     r,
                     { Iterating = true
                       Next = table.getNextCell g y.Next },
