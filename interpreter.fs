@@ -10,6 +10,7 @@ type Exp =
     | Var of Ident
     | Int of int
     | Add of Exp * Exp
+    | Mult of Exp * Exp
     | Sub of Exp * Exp
     | Bool of bool
     | And of Exp * Exp
@@ -83,6 +84,10 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
     | Add(e1, e2) ->
         match evalExp e1 r t, evalExp e2 r t with
         | Some(IntVal i1), Some(IntVal i2) -> Some(IntVal(i1 + i2))
+        | _, _ -> None
+    | Mult(e1, e2) ->
+        match evalExp e1 r t, evalExp e2 r t with
+        | Some(IntVal i1), Some(IntVal i2) -> Some(IntVal(i1 * i2))
         | _, _ -> None
     | Sub(e1, e2) ->
         match evalExp e1 r t, evalExp e2 r t with
