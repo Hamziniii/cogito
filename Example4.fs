@@ -1,6 +1,3 @@
-// IMPORTANT:
-// MUST RUN AFTER EXAMPLE 1
-
 module main
 
 open table
@@ -43,6 +40,13 @@ let prog =
 
           Fill(Range(Cell(Int 2, Int 6), Cell(Int 10, Int 6), ByCol(TToB, LToR)), Str "VIEW: " )
           Fill(Range(Cell(Int 2, Int 7), Cell(Int 10, Int 7), ByCol(TToB, LToR)), View(Range(Cell(Int 2, Int 2), Cell(Int 10, Int 2), ByCol(TToB, LToR))))
+
+          Fill(Cell(Int 1, Int 1), Int 15)
+          Assign("x", Int 1)
+          ForRange("i", Range(Cell(Int 1, Int 2), Cell(Int 1, Int 10), ByRow(LToR, TToB)), Seq([
+            Fill(Var "i", Add(Deref(Cell(Int 1, Var "x")), Int 1))
+            Assign("x", Add(Var "x", Int 1))
+          ]))
         ]
     )
 
