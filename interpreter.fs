@@ -15,6 +15,8 @@ type Exp =
     | And of Exp * Exp
     | Or of Exp * Exp
     | Not of Exp
+    | Gt of Exp * Exp
+    | Lt of Exp * Exp
     | Eq of Exp * Exp
     | Str of string
     | Excel of table.ExcelExpr
@@ -99,6 +101,14 @@ let rec evalExp (e: Exp) (r: Env) (t: table.Table) : Value option =
         match evalExp e r t with
         | Some(BoolVal b) -> Some(BoolVal(not b))
         | _ -> None
+    | Gt(e1, e2) ->
+        match evalExp e1 r t, evalExp e2 r t with
+        | Some(IntVal i1), Some(IntVal i2) -> Some(BoolVal(i1 > i2))
+        | _, _ -> None
+    | Lt(e1, e2) ->
+        match evalExp e1 r t, evalExp e2 r t with
+        | Some(IntVal i1), Some(IntVal i2) -> Some(BoolVal(i1 < i2))
+        | _, _ -> None
     | Eq(e1, e2) ->
         match evalExp e1 r t, evalExp e2 r t with
         | Some(IntVal i1), Some(IntVal i2) -> Some(BoolVal(i1 = i2))
