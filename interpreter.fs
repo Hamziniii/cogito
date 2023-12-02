@@ -150,7 +150,7 @@ let rec stepCmd ((c, r, y, t): Config) : Config option =
         match stepCmd (c1, r, y, t) with
         | Some(c1', r', y', t') -> Some(Seq(c1' :: c2), r', y', t')
         | _ -> None
-    | Seq([])
+    | Seq([]) -> Some(Skip, r, y, t)
     | Skip -> None
     | If(e, c1, c2) ->
         match evalExp e r t with
